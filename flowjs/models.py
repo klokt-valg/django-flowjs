@@ -2,14 +2,15 @@ import os
 import threading
 
 from django.conf import settings
-from django.core.files.storage import default_storage
+from django.core.files.storage import default_storage, FileSystemStorage
 from django.db import models
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 
 from .settings import (FLOWJS_AUTO_DELETE_CHUNKS,
                        FLOWJS_JOIN_CHUNKS_IN_BACKGROUND, FLOWJS_PATH,
-                       FLOWJS_REMOVE_FILES_ON_DELETE, FLOWJS_WITH_CELERY)
+                       FLOWJS_REMOVE_FILES_ON_DELETE, FLOWJS_WITH_CELERY,
+                       FLOWJS_USE_LOCALSTORAGE)
 from .signals import file_is_ready, file_joining_failed, file_upload_failed
 from .utils import chunk_upload_to, guess_filetype
 
@@ -46,6 +47,12 @@ class FlowFile(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateField(auto_now=True)
 
+    if FLOWJS_USE_LOCALSTORAGE == True:
+        storage = FileSystemStorage()
+    else:
+        storage = default_storage
+
+
     def __unicode__(self):
         return self.identifier
 
@@ -79,7 +86,7 @@ class FlowFile(models.Model):
         Return the uploaded file
         """
         if self.state == self.STATE_COMPLETED:
-            return default_storage.open(self.path)
+            return self.storage.open(self.path)
         return None
 
     @property
@@ -133,7 +140,7 @@ class FlowFile(models.Model):
 
     def _join_chunks(self):
         try:
-            temp_file = default_storage.open(self.path, 'wb')
+            temp_file = self.storage.open(self.path, 'wb')
             for chunk in self.chunks.all():
                 chunk_bytes = chunk.file.read()
                 temp_file.write(chunk_bytes)
@@ -207,7 +214,11 @@ def flow_file_delete(sender, instance, **kwargs):
     Remove files on delete if is activated in settings
     """
     if FLOWJS_REMOVE_FILES_ON_DELETE:
-        default_storage.delete(instance.path)
+        if FLOWJS_USE_LOCALSTORAGE:
+            storage = FileSystemStorage()
+        else:
+            storage = default_storage
+        storage.delete(instance.path)
 
 
 @receiver(pre_delete, sender=FlowFileChunk)

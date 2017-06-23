@@ -1,7 +1,11 @@
 from django.conf import settings
 
 # Media path where the files are saved
+# Files will be saved to default file storage
 FLOWJS_PATH = getattr(settings, "FLOWJS_PATH", 'flowjs/')
+
+# Indicates whether to use local storage or default storage
+FLOWJS_USE_LOCALSTORAGE = getattr(settings, "FLOWJS_USE_LOCALSTORAGE", False)
 
 # Remove the upload files when the model is deleted
 FLOWJS_REMOVE_FILES_ON_DELETE = getattr(settings, "FLOWJS_REMOVE_FILES_ON_DELETE", True)
